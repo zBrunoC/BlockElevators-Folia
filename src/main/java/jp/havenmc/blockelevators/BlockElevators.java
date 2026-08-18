@@ -17,26 +17,25 @@ import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class BlockElevators extends JavaPlugin implements Listener {
 
-    private final Set<Material> materials = new HashSet<>();
-    private final Set<String> worlds = new HashSet<>();
-    private final Map<UUID, Long> cooldown = new HashMap<>();
+    private final Set<Material> materials = ConcurrentHashMap.newKeySet();
+    private final Set<String> worlds = ConcurrentHashMap.newKeySet();
+    private final Map<UUID, Long> cooldown = new ConcurrentHashMap<>();
 
-    private int maxRange;
-    private int cooldownSeconds;
+    private volatile int maxRange;
+    private volatile int cooldownSeconds;
 
-    private boolean soundEnable;
-    private Sound sound;
-    private float volume;
-    private float jumpPitch;
-    private float sneakPitch;
+    private volatile boolean soundEnable;
+    private volatile Sound sound;
+    private volatile float volume;
+    private volatile float jumpPitch;
+    private volatile float sneakPitch;
 
     private enum Direction {
         UP(1),
@@ -178,17 +177,20 @@ public final class BlockElevators extends JavaPlugin implements Listener {
         destination.setYaw(player.getLocation().getYaw());
         destination.setPitch(player.getLocation().getPitch());
 
-        player.teleport(destination);
-        player.setFallDistance(0);
+        player.teleportAsync(destination).thenAccept(success -> {
+            if (Boolean.TRUE.equals(success)) {
+                player.setFallDistance(0);
 
-        if (soundEnable) {
-            player.playSound(
-                    destination,
-                    sound,
-                    volume,
-                    pitch
-            );
-        }
+                if (soundEnable) {
+                    player.playSound(
+                            destination,
+                            sound,
+                            volume,
+                            pitch
+                    );
+                }
+            }
+        });
     }
 
     private Location findDestination(
@@ -241,11 +243,8 @@ public final class BlockElevators extends JavaPlugin implements Listener {
         if (cooldownSeconds <= 0) return false;
 
         long now = System.currentTimeMillis();
-
-        cooldown.entrySet()
-                .removeIf(entry -> entry.getValue() <= now);
-
         UUID uuid = player.getUniqueId();
+
         Long expire = cooldown.get(uuid);
 
         if (expire == null || now >= expire) {
@@ -253,7 +252,6 @@ public final class BlockElevators extends JavaPlugin implements Listener {
                     uuid,
                     now + cooldownSeconds * 1000L
             );
-
             return false;
         }
 

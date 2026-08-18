@@ -1,8 +1,9 @@
 name: Block-Elevators
 version: 1.0.0
 main: jp.havenmc.blockelevators.BlockElevators
-api-version: '1.21'
+api-version: '26.1'
 author: ryusei_sky
+folia-supported: true
 
 commands:
   block-elevators-reload:
